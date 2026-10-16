@@ -1,6 +1,6 @@
 # NESI — Personal Agentic AI
 
-**NESI** is a personal agentic AI project designed to plan tasks with a cloud- or locally-hosted language model and, with explicit permission, carry out validated actions on the user's real Windows PC and Android device.
+**NESI** is a personal agentic AI project designed to plan tasks with a cloud- or locally-hosted language model and, with explicit permission, carry out validated actions on the user's real Windows PC and Android device. A planned application area is a YouTube Creator Agent that assists with original content production, publishing workflows, community replies, and channel analytics.
 
 The goal is a reliable **plan → act → observe → verify** loop—not an unrestricted chatbot that can execute arbitrary commands.
 
@@ -16,6 +16,7 @@ This repository currently documents the architecture and roadmap. It does **not*
 - [ ] Windows device agent implemented and connected end-to-end.
 - [ ] Structured plan/action/observation/verification loop implemented and tested.
 - [ ] Android agent integrated.
+- [ ] YouTube Creator Agent implemented with official APIs, creator-style memory, review gates, and analytics feedback.
 - [ ] Durable memory and task history implemented.
 
 ## Intended architecture
@@ -126,6 +127,71 @@ A safe agent loop:
 
 Use step limits, execution timeouts, cancellation, and a task-level budget to avoid runaway loops. A plan is not evidence that an action happened.
 
+
+## YouTube Creator Agent (planned)
+
+NESI may include a creator workflow to help manage **the user's own YouTube channel**. The goal is to amplify the creator's ideas and voice—not mass-produce interchangeable videos or simulate fake engagement.
+
+### Creator memory: personalize before fine-tuning
+
+Do not train a foundation model from scratch for the first version. Start with a provider-neutral base model plus a channel profile and retrieval from creator-approved material:
+
+- Channel niche, audience, tone, language, boundaries, and goals.
+- The user's own scripts, outlines, captions/transcripts, and approved examples.
+- Previously published titles, topics, and available channel analytics.
+- Examples of replies that the creator personally approved.
+- A correction log recording edits to AI-generated drafts.
+
+Use retrieval-augmented generation (RAG) to provide relevant examples at generation time. Keep facts and source material separate from style preferences. Consider a small LoRA fine-tune only after there is a substantial, curated set of high-quality examples and a measurable reason that retrieval and prompting are insufficient. Never treat audience comments or scraped third-party content as automatically consented training data.
+
+### Content production pipeline
+
+1. **Research** — collect topic ideas and sources; record links and evidence for factual claims.
+2. **Select** — rank ideas against the channel niche, audience needs, originality, and production effort.
+3. **Draft** — generate multiple hooks, an outline, a script, title options, description, and visual/shot suggestions.
+4. **Validate** — check factual claims, originality, asset licensing, sensitive topics, and creator-specific style constraints.
+5. **Produce** — create an editable storyboard or timeline, captions, and a render using approved assets and tools such as FFmpeg where useful.
+6. **Review** — show the creator the complete draft and required disclosures before publication.
+7. **Publish** — use the official YouTube Data API with user-authorized OAuth permissions; begin with private or unlisted test uploads. Publishing or scheduling must be an explicit configured permission.
+8. **Learn** — retrieve authorized channel analytics and use performance as evidence for future experiments, not as a guarantee of virality.
+
+The YouTube Data API supports video uploads through `videos.insert`, and the YouTube Analytics API exposes channel performance reports. API access requires appropriate OAuth authorization: [video upload](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert), [OAuth authorization](https://developers.google.com/youtube/v3/guides/authentication), and [YouTube Analytics](https://developers.google.com/youtube/analytics/reference).
+
+### Community inbox
+
+Start with an **assistive inbox**, not a bot that replies indiscriminately:
+
+- Read comments from the authorized channel using the official API.
+- Classify them as question, praise, constructive criticism, spam, safety concern, or sensitive/uncertain.
+- Draft specific replies in the creator's voice, grounded in the video and verified context.
+- Show the original comment, proposed response, and a reason/confidence indicator.
+- Require creator approval by default; any later automatic replies should be opt-in, rate-limited, and limited to a narrow set of low-risk, approved FAQs.
+- Escalate harassment, threats, privacy issues, controversy, legal/medical/financial topics, and ambiguous situations for human review.
+- Never post repetitive unsolicited comments, generate fake engagement, impersonate a real person, or use engagement bait to manipulate metrics.
+
+The official API supports listing comment threads and inserting replies, subject to authorization and quota limits: [comment threads](https://developers.google.com/youtube/v3/docs/commentThreads) and [comment replies](https://developers.google.com/youtube/v3/docs/comments/insert).
+
+### Required creator safeguards
+
+- The creator remains responsible for what gets published and for compliance with Community Guidelines and copyright.
+- Require disclosure when realistic, meaningfully altered or synthetic content falls under YouTube's disclosure requirements: [YouTube AI disclosure guidance](https://support.google.com/youtube/answer/14328491).
+- Avoid generic, interchangeable, mass-produced uploads. YouTube's monetization policy identifies repetitive or mass-produced content as "inauthentic content": [monetization policies](https://support.google.com/youtube/answer/1311392).
+- Use original commentary and a distinct creative contribution; keep source links and asset provenance with each draft.
+- Protect OAuth refresh tokens as secrets, request only necessary scopes, support disconnect/revocation, and minimize stored commenter data.
+- Keep a human-review gate for video publishing, contentious replies, moderation actions, and changes to channel settings.
+
+### First Creator Agent vertical slice
+
+1. Import the user's channel profile and a small set of their own scripts.
+2. Generate three distinct video ideas and one script with sources and uncertainty notes.
+3. Let the creator edit and approve the script.
+4. Generate a metadata package and a production checklist; no public upload yet.
+5. Build a comment inbox that drafts replies but does not send them automatically.
+6. Only after review and testing, add OAuth upload and scheduled publishing.
+7. Use analytics to compare outcomes and update the channel profile—not to automatically repeat a template that merely performed well.
+
+This feature is planned only. It is **not implemented** in the current repository.
+
 ## Security model
 
 Device-control software must be conservative by default:
@@ -174,6 +240,13 @@ Device-control software must be conservative by default:
 - Add integration tests, structured logging, and a setup guide.
 - Benchmark candidate models against real planning/tool-use tasks instead of choosing by parameter count alone.
 
+### Milestone 7 — YouTube Creator Agent
+- Build a channel profile and retrieval over the creator's own approved scripts and examples.
+- Generate topic ideas, sourced scripts, metadata, and production checklists for manual review.
+- Add a comment inbox with classifications and reply drafts; do not send replies automatically in the first version.
+- Add YouTube OAuth and official API integration after draft workflows are reliable.
+- Add explicit publication approval, AI disclosure checks, asset provenance, privacy controls, and analytics feedback.
+
 ## Suggested development stack
 
 - **Backend/orchestrator:** Python, FastAPI, Pydantic.
@@ -181,6 +254,8 @@ Device-control software must be conservative by default:
 - **Networking:** private overlay network such as Tailscale plus per-agent authentication and authorization.
 - **Windows agent:** Python for the first prototype; use a narrower native implementation later if reliability or packaging requires it.
 - **Android agent:** a dedicated Android app/accessibility or UI automation integration with clear runtime permissions.
+- **YouTube integration (planned):** YouTube Data API v3 and YouTube Analytics API through OAuth 2.0; begin with read-only access and draft-only workflows where possible.
+- **Creator memory (planned):** channel profile + retrieval over creator-approved material; add fine-tuning only when a curated dataset justifies it.
 - **Testing:** unit tests for policy/schema logic, mocked device agents, and explicit end-to-end tests against a test device.
 
 These are recommendations for the implementation, not a claim that these components have all been built.
