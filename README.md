@@ -17,6 +17,8 @@ This repository currently documents the architecture and roadmap. It does **not*
 - [ ] Structured plan/action/observation/verification loop implemented and tested.
 - [ ] Android agent integrated.
 - [ ] YouTube Creator Agent implemented with official APIs, creator-style memory, review gates, and analytics feedback.
+- [ ] Template-driven Shorts rendering implemented with validated edit plans, reusable templates, and automated quality checks.
+- [ ] Two niche profiles evaluated for audience overlap before choosing one versus two channels.
 - [ ] Durable memory and task history implemented.
 
 ## Intended architecture
@@ -150,12 +152,44 @@ Use retrieval-augmented generation (RAG) to provide relevant examples at generat
 2. **Select** — rank ideas against the channel niche, audience needs, originality, and production effort.
 3. **Draft** — generate multiple hooks, an outline, a script, title options, description, and visual/shot suggestions.
 4. **Validate** — check factual claims, originality, asset licensing, sensitive topics, and creator-specific style constraints.
-5. **Produce** — create an editable storyboard or timeline, captions, and a render using approved assets and tools such as FFmpeg where useful.
-6. **Review** — show the creator the complete draft and required disclosures before publication.
-7. **Publish** — use the official YouTube Data API with user-authorized OAuth permissions; begin with private or unlisted test uploads. Publishing or scheduling must be an explicit configured permission.
-8. **Learn** — retrieve authorized channel analytics and use performance as evidence for future experiments, not as a guarantee of virality.
+5. **Plan the edit** — emit a typed edit decision list with asset references, in/out timecodes, shot order, captions, overlays, zoom/reframe choices, transitions, music ducking, and target duration.
+6. **Render** — apply the validated edit plan through a deterministic renderer such as FFmpeg or a parameterized Remotion composition.
+7. **Quality-check** — inspect the rendered file for vertical framing, duration, clipping, caption safe areas, subtitle timing, black/frozen frames, audio peaks, and missing assets.
+8. **Review** — show the creator the complete draft and required disclosures before publication.
+9. **Publish** — use the official YouTube Data API with user-authorized OAuth permissions; begin with private or unlisted test uploads. Publishing or scheduling must be an explicit configured permission.
+10. **Learn** — retrieve authorized channel analytics and use performance as evidence for future experiments, not as a guarantee of virality.
 
 The YouTube Data API supports video uploads through `videos.insert`, and the YouTube Analytics API exposes channel performance reports. API access requires appropriate OAuth authorization: [video upload](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert), [OAuth authorization](https://developers.google.com/youtube/v3/guides/authentication), and [YouTube Analytics](https://developers.google.com/youtube/analytics/reference).
+
+### Template-driven Shorts editor
+
+The proposed editor should reuse a locked visual system while varying the substance and timeline for each Short. Do not ask the model to invent arbitrary editing commands; let it emit a validated edit plan consumed by a deterministic renderer.
+
+**Fixed template properties** can include the vertical canvas, typography, brand colors, caption style and safe zones, logo placement, audio loudness target, intro/outro rules, and transition presets.
+
+**Per-video editable properties** can include the topic, hook, narration, approved footage, clip in/out points, scene order, B-roll, crop/reframe coordinates, emphasis words, subtitle timing, music bed, sound effects, and call to action.
+
+Suggested implementation options:
+
+- **Recommended for this project:** Remotion with React/TypeScript for a reusable, inspectable composition and JSON props; FFmpeg for trimming, audio normalization/mixing, encoding, and final media operations. Remotion supports parameterized rendering: [Remotion docs](https://www.remotion.dev/docs/parameterized-rendering).
+- **Alternative hosted service:** a template-rendering API such as Creatomate, where a saved template can be rendered with per-video modifications. This can speed up prototyping but adds API cost and a third-party dependency: [template rendering](https://creatomate.com/docs/api/quick-start/create-a-video-by-template).
+- **Existing-editor workflow:** create a human-editable draft or project first and keep final approval manual until the automated output is consistently reliable.
+
+Potential automated steps: generate or import a transcript, find candidate clip boundaries, rank useful moments, cut dead air, reframe to 9:16, track the speaker when possible, generate word- or phrase-timed captions, emphasize key terms, duck background music beneath narration, and produce a preview. These should be separate, testable operations—not one opaque prompt.
+
+Every render should retain a manifest of source asset, license/source, selected timecodes, template version, script version, model/settings used, and QC results. Use only footage and audio that the creator owns, is licensed to use, or is otherwise authorized to include.
+
+### Two niches on one channel
+
+Support two named content profiles, but **do not assume one channel is always the right strategy**. The decision depends on whether the same viewer is likely to want both types of content.
+
+- **One channel can work** when both niches share an audience or a clear umbrella promise—for example, AI tools and practical developer builds for people interested in building with technology. Give each series its own label, playlist, color accent, and recurring structure while preserving the channel-wide design system.
+- **Separate channels are usually cleaner** when the viewer intent is very different—for example, programming tutorials and unrelated celebrity gossip. A shared editing template does not make two audiences compatible.
+- Test a small, clearly labeled batch of each series and compare audience retention, returning viewers, subscribers gained, and comment quality by series before committing.
+
+YouTube's monetization policy permits a consistent intro/outro when the substance differs, but warns that interchangeable, mass-produced or minimally varied videos may be ineligible for monetization. The videos need meaningful original commentary, storytelling, education, or entertainment—not merely different nouns in the same shell: [YouTube monetization policy](https://support.google.com/youtube/answer/1311392).
+
+For NESI, store each niche's topic constraints, vocabulary, audience persona, script pattern, approved source types, and visual theme in a separate `niche_profile`. Both can share rendering infrastructure, but the script and story must be specific to the selected niche.
 
 ### Community inbox
 
@@ -256,6 +290,8 @@ Device-control software must be conservative by default:
 - **Android agent:** a dedicated Android app/accessibility or UI automation integration with clear runtime permissions.
 - **YouTube integration (planned):** YouTube Data API v3 and YouTube Analytics API through OAuth 2.0; begin with read-only access and draft-only workflows where possible.
 - **Creator memory (planned):** channel profile + retrieval over creator-approved material; add fine-tuning only when a curated dataset justifies it.
+- **Shorts rendering (planned):** Remotion + React/TypeScript for editable compositions, FFmpeg for media operations, and validated JSON edit manifests.
+- **Niche profiles (planned):** separate per-niche audience, style, topic and source constraints while sharing the render/upload pipeline.
 - **Testing:** unit tests for policy/schema logic, mocked device agents, and explicit end-to-end tests against a test device.
 
 These are recommendations for the implementation, not a claim that these components have all been built.
